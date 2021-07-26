@@ -18,5 +18,4 @@ def ssl?(x)
   end
 end
 
-dat = IO.readlines("inputs/q07.txt", chomp: true)
-dat.count {|x| ssl?(x)}
+puts "Part2: #{dat.count {|x| ssl?(x)}}"
