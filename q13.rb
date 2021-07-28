@@ -1,4 +1,4 @@
-$num = IO.read('inputs/q13.txt', chomp: true).to_i
+$num = IO.read('inputs/q13.txt').to_i
 
 def wall?(p)
   x, y = p
