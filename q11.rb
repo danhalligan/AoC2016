@@ -1,39 +1,94 @@
-require "deep_clone"
+require 'deep_clone'
+require 'set'
 
-def chips(x)
-  x.select{|x| x.match(/.M/)}
-end
+class State
+  attr_accessor :config, :floor, :dist
 
-def rtgs(x)
-  x.select{|x| x.match(/.G/)}
-end
-
-def rtg2chip(x)
-  x.sub(/G$/, 'M')
-end
-
-def valid_arrangement(dat)
-  (0..3).each do |floor|
-    items = dat[floor]
-    if chips(items).length > 0 and rtgs(items).length > 0
-      mychips = chips(items)
-      rtgs(items).each {|g| mychips.delete(rtg2chip(g)) }
-    end
+  def initialize(data, floor = 0, dist = 0)
+    @config = data
+    @floor = floor
+    @dist = 0
   end
-  return true
+
+  def score
+    (0..3).map {|f| items(f).length * (f+1) }.sum
+  end
+
+  def stringify
+    (0..3).map {|f| items(f).sort.join('')}.join('|') + '|' + @floor.to_s
+  end
+
+  def items(f = @floor)
+    @config[f]
+  end
+
+  # which objects can be moved from our current floor?
+  # don't leave unmatched microchips
+  def movable
+    [1,2].map {|n| items.combination(n).to_a }.flatten(1)
+  end
+
+  # what directions can the elevator move in?
+  # don't move things back down to empty floors!
+  def directions
+    dirs = {0 => [1], 1 => [1, -1], 2 => [1, -1], 3 => [-1]}[@floor]
+    dirs = [1] if @floor == 1 and @config[0].length == 0
+    dirs = [1] if @floor == 2 and @config[1].length == 0 and @config[0].length == 0
+    dirs
+  end
+
+  # return possible new states from current
+  # don't move items if it leaves a floor invalid
+  # don't move 1 up if you can move 2 up
+  # don't move 2 down if you can move 1 down
+  def neighbours
+    set = movable.product(directions).select { |x|
+      valid_floor(Set.new(items) - Set.new(x)) or
+      valid_floor(Set.new(items(x[1])) + Set.new(x[0]))
+    }
+    twoup = set.any? {|x| x[1] == 1 and x[0].length == 2}
+    set = set.reject {|x| x[1] == 1 and x[0].length == 1} if twoup
+    onedn = set.any? {|x| x[1] == -1 and x[0].length == 1}
+    set = set.reject {|x| x[1] == -1 and x[0].length == 2} if onedn
+
+    set.map {|x|
+      nb = self.clone
+      nb.floor += x[1]
+      nb.dist += 1
+      nb.config[nb.floor] += x[0].each {|x| nb.config[floor].delete(x)}
+      nb
+    }
+  end
+
+  def valid_floor(items)
+    chips = Set.new(items.select{|x| x.match(/.M/)})
+    rtgs = Set.new(items.select{|x| x.match(/.G/)}.map{|x| rtg2chip(x.dup)})
+    return false if chips.length > 0 and rtgs.length > 0 and (chips-rtgs).length > 0
+    return true
+  end
+
+  def chips(floor)
+    @config[floor].select{|x| x.match(/.M/)}
+  end
+
+  def rtgs(floor)
+    @config[floor].select{|x| x.match(/.G/)}
+  end
+
+  def rtg2chip(x)
+    x[1] = 'M'
+    x
+  end
+
+  def clone
+    DeepClone.clone(self)
+  end
+
+  def target
+    @config.flatten.length * 4
+  end
 end
 
-def stringify(dat, floor)
-  (0..3).map { |floor| dat[floor].sort.join('')}.join('|') + '|' + floor.to_s
-end
-
-def directions(n)
-  {0 => [1], 1 => [1, -1], 2 => [1, -1], 3 => [-1]}[n]
-end
-
-def score(dat)
-  (0..3).map {|i| dat[i].length * (i+1) }.sum
-end
 
 def read_data(file = 'inputs/q11.txt')
   IO.readlines(file, chomp: true).map do |line|
@@ -43,34 +98,27 @@ def read_data(file = 'inputs/q11.txt')
   end
 end
 
-def neighbours(dat, floor, dist)
-  movable = [1,2].map { |items| dat[floor].combination(items).to_a }.flatten(1)
-  dirs = directions(floor)
-  options = movable.product(dirs).map do |x|
-    new_dat = DeepClone.clone(dat)
-    new_floor = floor + x[1]
-    new_dat[new_floor] += x[0].each { |x| new_dat[floor].delete(x) }
-    {dat: new_dat, floor: new_floor, score: score(new_dat), dist: dist+1}
-  end
-end
-
-def find_best(dat)
-  queue, discard, floor = [], {}, 0
-  queue.push({dat: dat, floor: floor, dist: 0, score: score(dat)})
-  target = dat.flatten.length * 4
+def find_best(x)
+  queue, discard = [], {}
+  queue.push(x)
+  target = x.target
+  best = x.score
   while true
-    c = queue.sort! {|x, y| y[:score] <=> x[:score] }.shift
-    return c if c[:score] == target
-    discard[stringify(c[:dat], c[:floor])] = c
-    neighbours(c[:dat], c[:floor], c[:dist]).
-      select {|x| !discard.key? stringify(x[:dat], x[:floor])}.
+    c = queue.sort! {|x, y| y.score <=> x.score }.shift
+    return c if c.score == target
+    if c.score > best
+      # puts "Score: #{c.score}, Dist: #{c.dist}"
+      best = c.score
+    end
+    discard[c.stringify] = true
+    c.neighbours.
+      select {|x| !discard.key? x.stringify}.
       each {|x| queue.push(x)}
   end
 end
 
+x = State.new(read_data())
+puts "Part1: #{find_best(x).dist}"
 
-dat = read_data()
-puts "Part1: #{find_best(dat)[:dist]}"
-
-dat[0] += ['EG', 'EM', 'DG', 'DM']
-puts "Part2: #{find_best(dat)[:dist]}"
+x.config[0] += ['EG', 'EM', 'DG', 'DM']
+puts "Part2: #{find_best(x).dist}"
