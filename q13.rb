@@ -13,19 +13,38 @@ def neighbours(p)
     select {|p| !wall?(p)}
 end
 
-x = [1,1]
-queue, discard = [], {}
-queue.push({pos:x, dist:0})
+queue, discard = {}, {}
+queue[[1,1]] =  {dist: 0, from: nil}
 target = [31,39]
-best = 10000
-while true
-  c = queue.sort! {|x, y| x[:dist] <=> y[:dist] }.shift
-  break c if c[:pos] == target
-  discard[c[:pos]] = c[:dist]
-  neighbours(c[:pos]).
+
+while queue.length > 0
+  c = queue.keys.first
+  cd = queue[c][:dist]
+  discard[c] = queue.delete(c)
+
+  neighbours(c).
     select {|x| !discard.key? x}.
-    each {|x| queue.push({pos:x, dist:c[:dist]+1})}
+    each {|x|
+      if !queue.key?(x) or (queue.key?(x) and cd + 1 < queue[x][:dist])
+        queue[x] = {dist: cd + 1, from: c}
+      end
+    }
 end
 
-puts "Part1: #{c[:dist]}"
+puts "Part1: #{discard[target][:dist]}"
+puts "Part1: #{discard.select{|k,v| v[:dist] <= 50}.length}"
+
+# show route!
+
+# route = [target]
+# route.unshift(discard[route[0]][:from]) while route[0] != [1,1]
+# maxx = discard.map{|k,v| k[0]}.max
+# maxy = discard.map{|k,v| k[1]}.max
+# pic = (0..maxy).map {|y|
+#   (0..maxx).map {|x|
+#     c = wall?([x,y]) ? '▓▓▓' : '   '
+#     route.include?([x,y]) ? ' o ' : c
+#   }.join("")
+# }.join("\n")
+# puts pic
 
