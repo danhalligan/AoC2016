@@ -12,7 +12,7 @@ def stretched_hash(i)
   h
 end
 
-def find_index(index)
+def find_index(target)
   stack = (0..999).map {|i| yield(i) }
   i = 0
   count = 1
@@ -21,7 +21,7 @@ def find_index(index)
     stack.push yield(i+1000)
     if h =~ /(\w)\1{2}/ and stack.any? {|x| x[$1*5]}
       # puts "#{i} #{count}"
-      return i if count == index
+      return i if count == target
       count += 1
     end
     i += 1
