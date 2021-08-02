@@ -19,8 +19,7 @@ def find_min_path(loc, target, path)
   return path if loc == target
   neighbours(loc, path).
     map {|k, v| find_min_path(v, target, path+k)}.
-    filter_map {|x| x}.
-    min_by {|x| x.length}
+    compact.min_by(&:length)
 end
 
 def find_max_dist(loc, target, path)
